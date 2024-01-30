@@ -6,7 +6,7 @@
 # 专栏摘抄
 
 1. Go 语言对协程的设计和对于 I/O 多路复用巧妙的封装，实现了同步编程的语义，但背后实则是异步 I/O 的处理模式。在减轻开发者心理负担的同时，提升了网络 I/O 的处理效率。 - 出自 [16｜网络爬虫： 一次HTTP请求的魔幻旅途]
-
+2. 空接口是实现反射的基础，因为空接口中会存储动态类型的信息，这为我们提供了复杂、意想不到的处理能力和灵活性。- 出自 [21｜采集引擎：实战接口抽象与模拟浏览器访问]
 
 # 官方库 | 第三方库
 
@@ -14,3 +14,8 @@
 - [官方处理字符集库2](golang.org/x/text/encoding)
 - [Xpath](https://github.com/antchfx/htmlquery)
 - [CSS选择器](https://github.com/PuerkitoBio/goquery)
+- [Chrome DevTools 协议库](https://github.com/chromedp/chromedp)
+
+# 其他
+
+- [解决WSL2 Google Chrome找不到执行路径问题](https://github.com/oven-sh/bun/issues/5416)
