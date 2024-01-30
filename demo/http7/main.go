@@ -30,7 +30,7 @@ func main() {
 
 	// 根据 CSS 标签选择器的语法查找匹配的标签，并遍历打印出 a 标签中的文本
 	// doc.Find("div.news_li h2 a[target=_blank]")
-	doc.Find("div a h2").Each(func(i int, s *goquery.Selection) {
+	doc.Find("div.small_cardcontent__BTALp h2").Each(func(i int, s *goquery.Selection) {
 		// 获取匹配标签中的文本
 		title := s.Text()
 		fmt.Printf("Review %d: %s\n", i, title)
