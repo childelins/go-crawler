@@ -3,6 +3,7 @@ package collect
 import (
 	"bufio"
 	"fmt"
+	"go-crawler/proxy"
 	"io"
 	"net/http"
 	"time"
@@ -43,12 +44,20 @@ func (BaseFetch) Get(url string) ([]byte, error) {
 
 type BrowserFetch struct {
 	Timeout time.Duration
+	Proxy   proxy.ProxyFunc
 }
 
 // 模拟浏览器访问
 func (b BrowserFetch) Get(url string) ([]byte, error) {
 	client := &http.Client{
 		Timeout: b.Timeout,
+	}
+
+	// 代理服务器
+	if b.Proxy != nil {
+		transport := http.DefaultTransport.(*http.Transport)
+		transport.Proxy = b.Proxy
+		client.Transport = transport
 	}
 
 	req, err := http.NewRequest("GET", url, nil)
