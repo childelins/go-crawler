@@ -1,0 +1,2 @@
+{"level":"INFO","ts":"2024-01-31T16:52:39.954+0800","caller":"go-crawler/main.go:24","msg":"log init end"}
+{"level":"INFO","ts":"2024-01-31T16:52:41.524+0800","caller":"go-crawler/main.go:48","msg":"get content","len":169063}
