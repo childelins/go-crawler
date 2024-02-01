@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-type Plugin zapcore.Core
+type Plugin = zapcore.Core
 
 func NewLogger(plugin zapcore.Core, options ...zap.Option) *zap.Logger {
 	return zap.New(plugin, append(DefaultOption(), options...)...)
