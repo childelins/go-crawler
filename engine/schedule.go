@@ -42,7 +42,13 @@ func (s *Schedule) Run() {
 }
 
 func (s *Schedule) Schedule() {
-	reqQueue := s.Seeds
+	var reqQueue []*collect.Request
+	for _, seed := range s.Seeds {
+		seed.RootReq.Task = seed
+		seed.RootReq.Url = seed.Url
+		reqQueue = append(reqQueue, seed.RootReq)
+	}
+
 	go func() {
 		for {
 			var req *collect.Request
