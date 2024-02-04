@@ -45,6 +45,7 @@ func main() {
 			Url:       url,
 			Cookie:    cookie,
 			WaitTime:  1 * time.Second,
+			MaxDepth:  5,
 			ParseFunc: doubangroup.ParseURL,
 		})
 	}

@@ -68,6 +68,11 @@ func (s *Schedule) Schedule() {
 func (s *Schedule) CreateWork() {
 	for {
 		r := <-s.workerCh
+		if err := r.Check(); err != nil {
+			s.Logger.Error("check failed", zap.Error(err))
+			continue
+		}
+
 		body, err := s.Fetcher.Get(r)
 		if len(body) < 6000 {
 			s.Logger.Error("can't fetch ",
@@ -77,7 +82,10 @@ func (s *Schedule) CreateWork() {
 			continue
 		}
 		if err != nil {
-			s.Logger.Error("can't fetch ", zap.Error(err))
+			s.Logger.Error("can't fetch ",
+				zap.Error(err),
+				zap.String("url", r.Url),
+			)
 			continue
 		}
 
@@ -99,5 +107,4 @@ func (s *Schedule) HandleResult() {
 			}
 		}
 	}
-
 }
