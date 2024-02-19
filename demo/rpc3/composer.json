@@ -1,0 +1,11 @@
+{
+    "name": "demo/rpc3",
+    "autoload": {
+        "psr-4": {
+            "Childelins\\Rpc3\\": "src/"
+        }
+    },
+    "require": {
+        "spiral/goridge": "^3.2"
+    }
+}
