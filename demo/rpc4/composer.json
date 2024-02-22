@@ -1,0 +1,9 @@
+{
+    "name": "demo/rpc4",
+    "autoload": {
+        "psr-4": {
+            "Demo\\Rpc4\\": "src/"
+        }
+    },
+    "require": {}
+}
