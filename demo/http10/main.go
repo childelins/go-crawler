@@ -25,7 +25,7 @@ func main() {
 }
 
 func handleTunneling(w http.ResponseWriter, r *http.Request) {
-	// 与目标服务器建立连接
+	// 与目标服务器建立TCP连接
 	dest_conn, err := net.DialTimeout("tcp", r.Host, 10*time.Second)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)

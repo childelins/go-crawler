@@ -14,6 +14,8 @@ func main() {
 		return
 	}
 
+	defer resp.Body.Close()
+
 	// 获取返回的数据
 	content, err := io.ReadAll(resp.Body)
 	if err != nil {

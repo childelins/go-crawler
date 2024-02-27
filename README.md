@@ -20,3 +20,11 @@
 # 其他
 
 - [解决WSL2 Google Chrome找不到执行路径问题](https://github.com/oven-sh/bun/issues/5416)
+
+# tag 标签
+
+```sh
+git commit -am "print resp"
+git tag -a v0.0.1 -m "print resp"
+git push origin v0.0.1
+```

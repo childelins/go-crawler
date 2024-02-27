@@ -28,6 +28,7 @@ func ProxyRequestHandler(proxy *httputil.ReverseProxy) http.HandlerFunc {
 }
 
 func NewProxy() (*httputil.ReverseProxy, error) {
+	// 实际的后端服务器地址
 	targetHost := "http://my-api-server.com"
 	url, err := url.Parse(targetHost)
 	if err != nil {
