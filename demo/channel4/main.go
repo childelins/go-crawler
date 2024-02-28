@@ -22,6 +22,7 @@ func pool(wg *sync.WaitGroup, workers, tasks int) {
 	}
 
 	for i := 0; i < tasks; i++ {
+		// 分配任务
 		tashCh <- i
 	}
 
@@ -32,6 +33,7 @@ func worker(tashCh <-chan int, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for {
+		// 开始获取任务
 		task, ok := <-tashCh
 		if !ok {
 			return

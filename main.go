@@ -21,8 +21,9 @@ func init() {
 	// log
 	plugin := log.NewStdoutPlugin(zapcore.InfoLevel)
 	logger = log.NewLogger(plugin)
-	logger.Info("log init end")
 	defer logger.Sync()
+
+	logger.Info("log init end")
 }
 
 func main() {

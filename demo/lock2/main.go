@@ -12,6 +12,7 @@ var count int64
 // 自旋锁
 func add() {
 	for {
+		// cas 原子性
 		if atomic.CompareAndSwapInt64(&flag, 0, 1) {
 			count++
 			atomic.StoreInt64(&flag, 0)
