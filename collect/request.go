@@ -14,10 +14,10 @@ type Task struct {
 	Cookie      string
 	WaitTime    time.Duration
 	Reload      bool // 网站是否可以重复爬取
-	MaxDepth    int
+	MaxDepth    int  // 爬取最大深度
 	Visited     map[string]bool
 	VisitedLock sync.Mutex
-	RootReq     *Request
+	RootReq     *Request // 初始请求
 	Fetcher     Fetcher
 }
 
@@ -27,11 +27,12 @@ type Request struct {
 	Task      *Task
 	Url       string
 	Method    string
-	Depth     int
-	Priority  int
+	Depth     int // 当前深度
+	Priority  int // 优先级队列
 	ParseFunc func([]byte, *Request) ParseResult
 }
 
+// 爬取结果
 type ParseResult struct {
 	Requests []*Request
 	Items    []interface{}
