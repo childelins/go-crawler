@@ -102,7 +102,13 @@ func main() {
 
 	// v2
 	seeds := make([]*collect.Task, 0, 1000)
-	cookie := `bid=qk-KbS-ffCg; douban-fav-remind=1; Hm_lvt_6d4a8cfea88fa457c3127e14fb5fabc2=1700728840; _ga=GA1.2.478668193.1700728840; ll="118201"; _ga_Y4GN1R87RG=GS1.1.1700728839.1.1.1700728894.0.0.0; viewed="1007305_35196328_35474931_35219951_36449803_36368057_36424128"; ap_v=0,6.0; __utmc=30149280; __utmz=30149280.1706838836.7.6.utmcsr=time.geekbang.org|utmccn=(referral)|utmcmd=referral|utmcct=/column/article/612328; __utma=30149280.125988448.1699844939.1706838836.1706844162.8; __utmt=1; dbcl2="126963156:6rHEcFsnXwM"; ck=Focf; push_noty_num=0; push_doumail_num=0; ct=y;`
+	cookie := `bid=qk-KbS-ffCg; douban-fav-remind=1; _pk_id.100001.8cb4=2b9cc6a45e496b68.1699844938.; ll="118201"; viewed="1007305_35196328_35474931_35219951_36449803_36368057_36424128"; __utmz=30149280.1706838836.7.6.utmcsr=time.geekbang.org|utmccn=(referral)|utmcmd=referral|utmcct=/column/article/612328; push_noty_num=0; push_doumail_num=0; __utmv=30149280.12696; _ga=GA1.2.478668193.1700728840; _ga_Y4GN1R87RG=GS1.1.1706844569.2.1.1706844957.0.0.0; _pk_ref.100001.8cb4=%5B%22%22%2C%22%22%2C1709532615%2C%22https%3A%2F%2Ftime.geekbang.org%2Fcolumn%2Farticle%2F612328%22%5D; _pk_ses.100001.8cb4=1; ap_v=0,6.0; __utma=30149280.125988448.1699844939.1709286691.1709532615.11; __utmc=30149280; __utmt=1; dbcl2="126963156:PCmGfH4AjBA"; ck=lbgb; __utmb=30149280.29.5.1709534687162`
+
+	f := collect.BrowserFetch{
+		Timeout: 5000 * time.Millisecond,
+		Proxy:   nil,
+		Logger:  logger,
+	}
 
 	for i := 0; i <= 100; i += 25 {
 		url := fmt.Sprintf("https://www.douban.com/group/szsh/discussion?start=%d", i)
@@ -111,24 +117,22 @@ func main() {
 			Cookie:   cookie,
 			WaitTime: 1 * time.Second,
 			MaxDepth: 5,
+			Fetcher:  f,
 			RootReq: &collect.Request{
+				Priority:  1,
+				Method:    "GET",
 				ParseFunc: doubangroup.ParseURL,
 			},
 		})
 	}
 
-	f := collect.BrowserFetch{
-		Timeout: 5000 * time.Millisecond,
-		Proxy:   nil,
-		Logger:  logger,
-	}
-
-	s := engine.NewSchedule(
+	e := engine.NewEngine(
 		engine.WithFetcher(f),
 		engine.WithLogger(logger),
 		engine.WithWorkCount(5),
 		engine.WithSeeds(seeds),
+		engine.WithScheduler(engine.NewSchedule()),
 	)
 
-	s.Run()
+	e.Run()
 }

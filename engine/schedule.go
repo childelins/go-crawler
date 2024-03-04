@@ -2,115 +2,202 @@ package engine
 
 import (
 	"go-crawler/collect"
+	"sync"
 
 	"go.uber.org/zap"
 )
 
-type Schedule struct {
-	requestCh chan *collect.Request
-	workerCh  chan *collect.Request
-	out       chan collect.ParseResult
+type Crawler struct {
+	out         chan collect.ParseResult
+	Visited     map[string]bool
+	VisitedLock sync.Mutex
+
+	failures    map[string]*collect.Request // 失败请求id -> 失败请求
+	failureLock sync.Mutex
 	options
 }
 
-func NewSchedule(opts ...Option) *Schedule {
+type Scheduler interface {
+	Schedule()
+	Push(...*collect.Request)
+	Pull() *collect.Request
+}
+
+type Schedule struct {
+	requestCh   chan *collect.Request
+	workerCh    chan *collect.Request
+	priReqQueue []*collect.Request
+	reqQueue    []*collect.Request
+	Logger      *zap.Logger
+}
+
+func NewEngine(opts ...Option) *Crawler {
 	options := defaultOptions
 	for _, opt := range opts {
 		opt(&options)
 	}
 
+	e := &Crawler{}
+	e.Visited = make(map[string]bool, 100)
+	out := make(chan collect.ParseResult)
+	e.out = out
+	e.failures = make(map[string]*collect.Request)
+	e.options = options
+	return e
+}
+
+func NewSchedule() *Schedule {
 	s := &Schedule{}
-	s.options = options
+	requestCh := make(chan *collect.Request)
+	workerCh := make(chan *collect.Request)
+	s.requestCh = requestCh
+	s.workerCh = workerCh
 	return s
 }
 
-func (s *Schedule) Run() {
-	requesCh := make(chan *collect.Request)
-	workerCh := make(chan *collect.Request)
-	out := make(chan collect.ParseResult)
-
-	s.requestCh = requesCh
-	s.workerCh = workerCh
-	s.out = out
-
-	go s.Schedule()
-	for i := 0; i < s.WorkCount; i++ {
-		go s.CreateWork()
+func (e *Crawler) Run() {
+	go e.Schedule()
+	for i := 0; i < e.WorkCount; i++ {
+		go e.CreateWork()
 	}
+	e.HandleResult()
+}
 
-	s.HandleResult()
+func (s *Schedule) Push(reqs ...*collect.Request) {
+	for _, req := range reqs {
+		s.requestCh <- req
+	}
+}
+
+func (s *Schedule) Pull() *collect.Request {
+	r := <-s.workerCh
+	return r
+}
+
+func (s *Schedule) Output() *collect.Request {
+	r := <-s.workerCh
+	return r
 }
 
 func (s *Schedule) Schedule() {
-	var reqQueue []*collect.Request
-	for _, seed := range s.Seeds {
-		seed.RootReq.Task = seed
-		seed.RootReq.Url = seed.Url
-		reqQueue = append(reqQueue, seed.RootReq)
-	}
-
-	go func() {
-		for {
-			var req *collect.Request
-			var ch chan *collect.Request
-
-			if len(reqQueue) > 0 {
-				req = reqQueue[0]
-				reqQueue = reqQueue[1:]
-				ch = s.workerCh
-			}
-
-			select {
-			case r := <-s.requestCh:
-				// 接收请求，存放在 reqQueue 队列中
-				reqQueue = append(reqQueue, r)
-			case ch <- req:
-				// 从 reqQueue 取一个任务，分发到 worker channel，等待 worker 处理
-			}
+	var req *collect.Request
+	var ch chan *collect.Request
+	for {
+		if req == nil && len(s.priReqQueue) > 0 {
+			req = s.priReqQueue[0]
+			s.priReqQueue = s.priReqQueue[1:]
+			ch = s.workerCh
 		}
-	}()
+		if req == nil && len(s.reqQueue) > 0 {
+			req = s.reqQueue[0]
+			s.reqQueue = s.reqQueue[1:]
+			ch = s.workerCh
+		}
+
+		select {
+		case r := <-s.requestCh:
+			if r.Priority > 0 {
+				s.priReqQueue = append(s.priReqQueue, r)
+			} else {
+				s.reqQueue = append(s.reqQueue, r)
+			}
+		case ch <- req:
+			// 往 workerCh 写入数据
+			req = nil
+			ch = nil
+		}
+	}
 }
 
-func (s *Schedule) CreateWork() {
+func (e *Crawler) Schedule() {
+	var reqs []*collect.Request
+	for _, seed := range e.Seeds {
+		seed.RootReq.Task = seed
+		seed.RootReq.Url = seed.Url
+		reqs = append(reqs, seed.RootReq)
+	}
+
+	go e.scheduler.Schedule()
+	go e.scheduler.Push(reqs...)
+}
+
+func (e *Crawler) CreateWork() {
 	for {
-		r := <-s.workerCh
+		r := e.scheduler.Pull()
 		if err := r.Check(); err != nil {
-			s.Logger.Error("check failed", zap.Error(err))
+			e.Logger.Error("check failed", zap.Error(err))
 			continue
 		}
 
-		body, err := s.Fetcher.Get(r)
+		if !r.Task.Reload && e.HasVisited(r) {
+			e.Logger.Debug("request has visited", zap.String("url:", r.Url))
+		}
+		e.StoreVisited(r)
+
+		body, err := r.Task.Fetcher.Get(r)
 		if len(body) < 6000 {
-			s.Logger.Error("can't fetch ",
-				zap.Int("length", len(body)),
-				zap.String("url", r.Url),
-			)
+			e.Logger.Error("can't fetch ", zap.Int("length", len(body)), zap.String("url", r.Url))
+			e.SetFailure(r)
 			continue
 		}
 		if err != nil {
-			s.Logger.Error("can't fetch ",
-				zap.Error(err),
-				zap.String("url", r.Url),
-			)
+			e.Logger.Error("can't fetch ", zap.Error(err), zap.String("url", r.Url))
+			e.SetFailure(r)
 			continue
 		}
 
 		result := r.ParseFunc(body, r)
-		s.out <- result
+		if len(result.Requests) > 0 {
+			go e.scheduler.Push(result.Requests...)
+		}
+
+		e.out <- result
 	}
 }
 
-func (s *Schedule) HandleResult() {
+func (e *Crawler) HandleResult() {
 	for {
 		select {
-		case result := <-s.out:
-			for _, req := range result.Requests {
-				s.requestCh <- req
-			}
+		case result := <-e.out:
 			for _, item := range result.Items {
 				// todo: store
-				s.Logger.Sugar().Info("get result: ", item)
+				e.Logger.Sugar().Info("get result: ", item)
 			}
 		}
 	}
+}
+
+func (e *Crawler) HasVisited(r *collect.Request) bool {
+	e.VisitedLock.Lock()
+	defer e.VisitedLock.Unlock()
+	unique := r.Unique()
+	return e.Visited[unique]
+}
+
+func (e *Crawler) StoreVisited(reqs ...*collect.Request) {
+	e.VisitedLock.Lock()
+	defer e.VisitedLock.Unlock()
+
+	for _, r := range reqs {
+		unique := r.Unique()
+		e.Visited[unique] = true
+	}
+}
+
+func (e *Crawler) SetFailure(req *collect.Request) {
+	if !req.Task.Reload {
+		e.VisitedLock.Lock()
+		delete(e.Visited, req.Unique())
+		e.VisitedLock.Unlock()
+	}
+
+	e.failureLock.Lock()
+	defer e.failureLock.Unlock()
+	if _, ok := e.failures[req.Unique()]; !ok {
+		// 首次失败时，再重新执行一次
+		e.failures[req.Unique()] = req
+		e.scheduler.Push(req)
+	}
+
+	// todo: 失败2次，加载到失败队列中
 }
