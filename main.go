@@ -111,13 +111,13 @@ func main() {
 	}
 
 	for i := 0; i <= 100; i += 25 {
-		url := fmt.Sprintf("https://www.douban.com/group/szsh/discussion?start=%d", i)
+		url := fmt.Sprintf("https://www.douban.com/group/171570/discussion?start=%d", i)
 		seeds = append(seeds, &collect.Task{
 			Url:      url,
 			Cookie:   cookie,
 			WaitTime: 1 * time.Second,
 			MaxDepth: 5,
-			Fetcher:  f,
+			// Fetcher:  f,
 			RootReq: &collect.Request{
 				Priority:  1,
 				Method:    "GET",

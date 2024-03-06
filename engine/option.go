@@ -6,8 +6,10 @@ import (
 	"go.uber.org/zap"
 )
 
+// Functional Options
 type Option func(opts *options)
 
+// 可配置参数
 type options struct {
 	WorkCount int
 	Fetcher   collect.Fetcher
@@ -16,6 +18,7 @@ type options struct {
 	scheduler Scheduler
 }
 
+// 默认参数配置
 var defaultOptions = options{
 	Logger: zap.NewNop(),
 }

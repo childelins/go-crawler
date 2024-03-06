@@ -8,8 +8,8 @@ import (
 )
 
 type Crawler struct {
-	out         chan collect.ParseResult
-	Visited     map[string]bool
+	out         chan collect.ParseResult // 爬取结果
+	Visited     map[string]bool          // 过滤重复请求
 	VisitedLock sync.Mutex
 
 	failures    map[string]*collect.Request // 失败请求id -> 失败请求
@@ -26,9 +26,9 @@ type Scheduler interface {
 type Schedule struct {
 	requestCh   chan *collect.Request
 	workerCh    chan *collect.Request
-	priReqQueue []*collect.Request
-	reqQueue    []*collect.Request
-	Logger      *zap.Logger
+	priReqQueue []*collect.Request // 优先队列
+	reqQueue    []*collect.Request // 普通队列
+	// Logger      *zap.Logger
 }
 
 func NewEngine(opts ...Option) *Crawler {
@@ -74,20 +74,17 @@ func (s *Schedule) Pull() *collect.Request {
 	return r
 }
 
-func (s *Schedule) Output() *collect.Request {
-	r := <-s.workerCh
-	return r
-}
-
 func (s *Schedule) Schedule() {
 	var req *collect.Request
 	var ch chan *collect.Request
 	for {
+		// 先处理优先队列
 		if req == nil && len(s.priReqQueue) > 0 {
 			req = s.priReqQueue[0]
 			s.priReqQueue = s.priReqQueue[1:]
 			ch = s.workerCh
 		}
+		// 再处理普通队列
 		if req == nil && len(s.reqQueue) > 0 {
 			req = s.reqQueue[0]
 			s.reqQueue = s.reqQueue[1:]
@@ -96,13 +93,15 @@ func (s *Schedule) Schedule() {
 
 		select {
 		case r := <-s.requestCh:
+			// 根据请求的优先级，进对应队列
 			if r.Priority > 0 {
 				s.priReqQueue = append(s.priReqQueue, r)
 			} else {
 				s.reqQueue = append(s.reqQueue, r)
 			}
 		case ch <- req:
-			// 往 workerCh 写入数据
+			// req有值，此时 ch = workerCh， 即往 workerCh 写入数据
+			// 重置 req，进入下一轮 for 循环
 			req = nil
 			ch = nil
 		}
@@ -134,7 +133,8 @@ func (e *Crawler) CreateWork() {
 		}
 		e.StoreVisited(r)
 
-		body, err := r.Task.Fetcher.Get(r)
+		// body, err := r.Task.Fetcher.Get(r)
+		body, err := e.Fetcher.Get(r)
 		if len(body) < 6000 {
 			e.Logger.Error("can't fetch ", zap.Int("length", len(body)), zap.String("url", r.Url))
 			e.SetFailure(r)
@@ -148,6 +148,7 @@ func (e *Crawler) CreateWork() {
 
 		result := r.ParseFunc(body, r)
 		if len(result.Requests) > 0 {
+			// 追加爬取请求
 			go e.scheduler.Push(result.Requests...)
 		}
 
