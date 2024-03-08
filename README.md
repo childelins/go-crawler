@@ -29,3 +29,32 @@ git commit -am "print resp"
 git tag -a v0.0.1 -m "print resp"
 git push origin v0.0.1
 ```
+
+# 测试
+
+```go
+# 单元测试
+go test
+
+# 打印详细信息
+go test -v 
+
+# 指定要测试的函数名，支持模糊匹配
+go test -run=TestSplitWithSubTest
+
+# -c会生成可执行文件
+go test -c
+
+# 基准测试
+go test -bench=.
+
+# 禁止编译器的优化与内联
+go test -gcflags "-N -l" -bench=.
+
+# 代码覆盖率
+go test -cover
+
+# 可视化分析代码覆盖率信息
+go test -coverprofile=coverage.out
+go tool cover -html=coverage.out
+```
