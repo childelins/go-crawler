@@ -2,10 +2,31 @@ package engine
 
 import (
 	"go-crawler/collect"
+	"go-crawler/parse/doubangroup"
 	"sync"
 
 	"go.uber.org/zap"
 )
+
+func init() {
+	Store.Add(doubangroup.DoubangroupTask)
+}
+
+// 全局蜘蛛种类实例
+var Store = &CrawlerStore{
+	list: []*collect.Task{},
+	hash: map[string]*collect.Task{},
+}
+
+type CrawlerStore struct {
+	list []*collect.Task
+	hash map[string]*collect.Task
+}
+
+func (c *CrawlerStore) Add(task *collect.Task) {
+	c.hash[task.Name] = task
+	c.list = append(c.list, task)
+}
 
 type Crawler struct {
 	out         chan collect.ParseResult // 爬取结果
@@ -14,6 +35,7 @@ type Crawler struct {
 
 	failures    map[string]*collect.Request // 失败请求id -> 失败请求
 	failureLock sync.Mutex
+
 	options
 }
 
@@ -39,8 +61,7 @@ func NewEngine(opts ...Option) *Crawler {
 
 	e := &Crawler{}
 	e.Visited = make(map[string]bool, 100)
-	out := make(chan collect.ParseResult)
-	e.out = out
+	e.out = make(chan collect.ParseResult)
 	e.failures = make(map[string]*collect.Request)
 	e.options = options
 	return e
@@ -111,9 +132,16 @@ func (s *Schedule) Schedule() {
 func (e *Crawler) Schedule() {
 	var reqs []*collect.Request
 	for _, seed := range e.Seeds {
-		seed.RootReq.Task = seed
-		seed.RootReq.Url = seed.Url
-		reqs = append(reqs, seed.RootReq)
+		// must store value
+		task := Store.hash[seed.Name]
+		// 获取初始化任务
+		rootreqs := task.Rule.Root()
+		for _, req := range rootreqs {
+			// 此时赋值 task
+			req.Task = task
+		}
+
+		reqs = append(reqs, rootreqs...)
 	}
 
 	go e.scheduler.Schedule()
@@ -122,33 +150,39 @@ func (e *Crawler) Schedule() {
 
 func (e *Crawler) CreateWork() {
 	for {
-		r := e.scheduler.Pull()
-		if err := r.Check(); err != nil {
+		req := e.scheduler.Pull()
+		if err := req.Check(); err != nil {
 			e.Logger.Error("check failed", zap.Error(err))
 			continue
 		}
 
-		if !r.Task.Reload && e.HasVisited(r) {
-			e.Logger.Debug("request has visited", zap.String("url:", r.Url))
+		if !req.Task.Reload && e.HasVisited(req) {
+			e.Logger.Debug("request has visited", zap.String("url:", req.Url))
 		}
-		e.StoreVisited(r)
+		e.StoreVisited(req)
 
-		// body, err := r.Task.Fetcher.Get(r)
-		body, err := e.Fetcher.Get(r)
-		if len(body) < 6000 {
-			e.Logger.Error("can't fetch ", zap.Int("length", len(body)), zap.String("url", r.Url))
-			e.SetFailure(r)
-			continue
-		}
+		body, err := e.Fetcher.Get(req)
 		if err != nil {
-			e.Logger.Error("can't fetch ", zap.Error(err), zap.String("url", r.Url))
-			e.SetFailure(r)
+			e.Logger.Error("can't fetch ", zap.Error(err), zap.String("url", req.Url))
+			e.SetFailure(req)
+			continue
+		}
+		if len(body) < 6000 {
+			e.Logger.Error("can't fetch ", zap.Int("length", len(body)), zap.String("url", req.Url))
+			e.SetFailure(req)
 			continue
 		}
 
-		result := r.ParseFunc(body, r)
+		// 获取当前任务对应的规则
+		rule := req.Task.Rule.Trunk[req.RuleName]
+		// 内容解析
+		result := rule.ParseFunc(&collect.Context{
+			Body: body,
+			Req:  req,
+		})
+
 		if len(result.Requests) > 0 {
-			// 追加爬取请求
+			// 新的任务加入队列中
 			go e.scheduler.Push(result.Requests...)
 		}
 
