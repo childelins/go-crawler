@@ -2,6 +2,7 @@ package engine
 
 import (
 	"go-crawler/collect"
+	"go-crawler/parse/doubanbook"
 	"go-crawler/parse/doubangroup"
 	"sync"
 
@@ -10,6 +11,7 @@ import (
 
 func init() {
 	Store.Add(doubangroup.DoubangroupTask)
+	Store.Add(doubanbook.DoubanBookTask)
 }
 
 // 全局蜘蛛种类实例
@@ -135,7 +137,12 @@ func (e *Crawler) Schedule() {
 		// must store value
 		task := Store.hash[seed.Name]
 		// 获取初始化任务
-		rootreqs := task.Rule.Root()
+		rootreqs, err := task.Rule.Root()
+		if err != nil {
+			e.Logger.Error("get root failed", zap.Error(err))
+			continue
+		}
+
 		for _, req := range rootreqs {
 			// 此时赋值 task
 			req.Task = task
@@ -176,10 +183,14 @@ func (e *Crawler) CreateWork() {
 		// 获取当前任务对应的规则
 		rule := req.Task.Rule.Trunk[req.RuleName]
 		// 内容解析
-		result := rule.ParseFunc(&collect.Context{
+		result, err := rule.ParseFunc(&collect.Context{
 			Body: body,
 			Req:  req,
 		})
+		if err != nil {
+			e.Logger.Error("ParseFunc failed", zap.Error(err), zap.String("url", req.Url))
+			continue
+		}
 
 		if len(result.Requests) > 0 {
 			// 新的任务加入队列中

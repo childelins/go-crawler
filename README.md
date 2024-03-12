@@ -17,6 +17,7 @@
 - [CSS选择器](https://github.com/PuerkitoBio/goquery)
 - [Chrome DevTools 协议库](https://github.com/chromedp/chromedp)
 - [高性能协程池](https://github.com/panjf2000/ants)
+- [JavaScript 虚拟机](https://github.com/robertkrimen/otto)
 
 # 其他
 

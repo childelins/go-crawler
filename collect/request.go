@@ -4,17 +4,23 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
+	"go-crawler/collector"
 	"time"
 )
 
+type Property struct {
+	Name     string        `json:"name"` // 任务名称，应保证唯一性
+	Url      string        `json:"url"`
+	Cookie   string        `json:"cookie"`
+	WaitTime time.Duration `json:"wait_time"`
+	Reload   bool          `json:"reload"`    // 网站是否可以重复爬取
+	MaxDepth int64         `json:"max_depth"` // 爬取最大深度
+}
+
 // 一个任务实例
 type Task struct {
-	Name     string // 用户界面显示的名称（应保证唯一性）
-	Url      string
-	Cookie   string
-	WaitTime time.Duration
-	Reload   bool // 网站是否可以重复爬取
-	MaxDepth int  // 爬取最大深度
+	Property
+
 	// Visited     map[string]bool
 	// VisitedLock sync.Mutex
 	// Fetcher Fetcher
@@ -26,15 +32,30 @@ type Context struct {
 	Req  *Request
 }
 
+func (c *Context) GetRule(ruleName string) *Rule {
+	return c.Req.Task.Rule.Trunk[ruleName]
+}
+
+func (c *Context) Output(data interface{}) *collector.OutputData {
+	res := &collector.OutputData{}
+	res.Data = make(map[string]interface{})
+	res.Data["Rule"] = c.Req.RuleName
+	res.Data["Data"] = data
+	res.Data["Url"] = c.Req.Url
+	res.Data["Time"] = time.Now().Format("2006-01-02 15:04:05")
+	return res
+}
+
 // 单个请求
 type Request struct {
 	// unique    string
 	Task     *Task // 指向具体任务
 	Url      string
 	Method   string
-	Depth    int    // 当前深度
-	Priority int    // 优先级队列
+	Depth    int64  // 当前深度
+	Priority int64  // 优先级队列
 	RuleName string // 规则名称
+	TmpData  *Temp  // 临时缓存数据
 }
 
 // 爬取结果
